@@ -22,7 +22,7 @@ void rcr_init(ComMod& com_mod, const CmMod& cm_mod);
 
 void RCR_Integ_X(ComMod& com_mod, const CmMod& cm_mod, int istat);
 
-void set_bc_cmm(ComMod& com_mod, const CmMod& cm_mod, const Array<double>& Ag, const Array<double>& Dg);
+void set_bc_cmm(ComMod& com_mod, const CmMod& cm_mod, const Array<double>& Ag, const Array<double>& Yg, const Array<double>& Dg);
 void set_bc_cmm_l(ComMod& com_mod, const CmMod& cm_mod, const faceType& lFa, const Array<double>& Ag, const Array<double>& Dg );
 
 void set_bc_cpl(ComMod& com_mod, CmMod& cm_mod);
@@ -47,4 +47,3 @@ void set_bc_undef_neu_l(ComMod& com_mod, const bcType& lBc, const faceType& lFa)
 };
 
 #endif
-

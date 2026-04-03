@@ -112,6 +112,56 @@ def run_by_name(folder, name, t_max, n_proc=1):
     return meshio.read(fname)
 
 
+def run_expect_failure(folder, name="solver.xml", n_proc=1):
+    """
+    Run a test case expected to fail and return the completed process.
+    Args:
+        folder: location from which test will be executed
+        name: name of svMultiPhysics input file (.xml)
+        n_proc: number of processors
+    """
+
+    if is_not_Darwin:
+        if "petsc" in folder:
+            cmd = " ".join(
+                [
+                    "mpirun",
+                    "--oversubscribe" if n_proc > 1 else "",
+                    "-np",
+                    str(n_proc),
+                    cpp_exec_p,
+                    name,
+                ]
+            )
+        else:
+            cmd = " ".join(
+                [
+                    "mpirun",
+                    "--oversubscribe" if n_proc > 1 else "",
+                    "-np",
+                    str(n_proc),
+                    cpp_exec,
+                    name,
+                ]
+            )
+    else:
+        if "petsc" in folder or "trilinos" in folder:
+            pytest.skip("Failure-path test not run for PETSc/Trilinos cases on Darwin")
+        else:
+            cmd = " ".join(
+                [
+                    "mpirun",
+                    "--oversubscribe" if n_proc > 1 else "",
+                    "-np",
+                    str(n_proc),
+                    cpp_exec,
+                    name,
+                ]
+            )
+
+    return subprocess.run(cmd, cwd=folder, shell=True, capture_output=True, text=True)
+
+
 def run_with_reference(
     base_folder,
     test_folder,

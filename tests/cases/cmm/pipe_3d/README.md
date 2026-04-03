@@ -109,5 +109,33 @@ If the prestress procedure is employed in **Step 2**, replace `<Initial_displace
 </Add_BC> 
 ```
 
+Robin wall support can be added directly to the same `Type = CMM` block. For
+uniform support:
+
+```
+<Add_BC name="lumen_wall" >
+  <Type> CMM </Type>
+  <Initial_displacements_file_path> ../2a-inflate/result_003.vtu </Initial_displacements_file_path>
+  <Stiffness> 250.0 </Stiffness>
+  <Damping> 5.0 </Damping>
+  <Apply_along_normal_direction> true </Apply_along_normal_direction>
+</Add_BC>
+```
+
+For spatially varying support, provide `Stiffness` and `Damping` point arrays in
+`Spatial_values_file_path` instead of scalar values:
+
+```
+<Add_BC name="lumen_wall" >
+  <Type> CMM </Type>
+  <Initial_displacements_file_path> ../2a-inflate/result_003.vtu </Initial_displacements_file_path>
+  <Spatial_values_file_path> robin_support.vtp </Spatial_values_file_path>
+  <Apply_along_normal_direction> true </Apply_along_normal_direction>
+</Add_BC>
+```
+
+Do not change the wall BC to `Type = Robin` for a CMM run. CMM wall preload
+still requires `Type = CMM`; Robin settings are additional fields on that same
+boundary condition.
 
 

@@ -31,6 +31,58 @@ namespace read_files_ns {
 //#include "set_output_props.h"
 #include "set_viscosity_props.h"
 
+namespace {
+
+bool cmm_robin_requested(BoundaryConditionParameters* bc_params)
+{
+  return bc_params->spatial_values_file_path.defined() ||
+         bc_params->stiffness.defined() ||
+         bc_params->damping.defined();
+}
+
+void initialize_robin_bc(
+    Simulation* simulation,
+    BoundaryConditionParameters* bc_params,
+    bcType& lBc,
+    bool use_explicit_scalar_defaults)
+{
+  auto& com_mod = simulation->com_mod;
+  const bool use_spatial_values = bc_params->spatial_values_file_path.defined();
+  const bool scalar_stiffness_defined = bc_params->stiffness.defined();
+  const bool scalar_damping_defined = bc_params->damping.defined();
+
+  if (use_spatial_values) {
+    if (scalar_stiffness_defined || scalar_damping_defined) {
+      throw std::runtime_error(
+          "[read_bc] Robin BC does not allow mixing Spatial_values_file_path with scalar "
+          "Stiffness or Damping values.");
+    }
+
+    lBc.robin_bc = RobinBoundaryCondition(
+        bc_params->spatial_values_file_path.value(),
+        bc_params->apply_along_normal_direction.value(),
+        com_mod.msh[lBc.iM].fa[lBc.iFa],
+        simulation->logger);
+    return;
+  }
+
+  const double stiffness = (use_explicit_scalar_defaults && !scalar_stiffness_defined)
+                               ? 0.0
+                               : bc_params->stiffness.value();
+  const double damping = (use_explicit_scalar_defaults && !scalar_damping_defined)
+                             ? 0.0
+                             : bc_params->damping.value();
+
+  lBc.robin_bc = RobinBoundaryCondition(
+      stiffness,
+      damping,
+      bc_params->apply_along_normal_direction.value(),
+      com_mod.msh[lBc.iM].fa[lBc.iFa],
+      simulation->logger);
+}
+
+} // namespace
+
 /// @brief Match two faces?
 ///
 /// \todo [TODO:DaveP] this has not been tested.
@@ -172,6 +224,12 @@ void read_bc(Simulation* simulation, EquationParameters* eq_params, eqType& lEq,
     }
 
   } else if (std::set<std::string>{"Robin", "Rbn"}.count(bc_type)) {
+    if (lEq.phys == EquationType::phys_CMM) {
+      throw std::runtime_error(
+          "[read_bc] Robin support for deformable CMM walls must be configured on a "
+          "Type = CMM boundary condition using Robin fields such as Stiffness, Damping, "
+          "Spatial_values_file_path, and Apply_along_normal_direction.");
+    }
     lBc.bType = utils::ibset(lBc.bType, enum_int(BoundaryConditionType::bType_Robin)); 
     lBc.bType = utils::ibset(lBc.bType, enum_int(BoundaryConditionType::bType_Neu)); 
 
@@ -364,20 +422,23 @@ void read_bc(Simulation* simulation, EquationParameters* eq_params, eqType& lEq,
   }
 
   // Stiffness and damping parameters for Robin BC
-  if (utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_Robin))) { 
-    
-    // Read VTP file path for per-node stiffness and damping (optional)
-    if (bc_params->spatial_values_file_path.defined()) {
-      lBc.robin_bc = RobinBoundaryCondition(bc_params->spatial_values_file_path.value(), 
-                                            bc_params->apply_along_normal_direction.value(),
-                                            com_mod.msh[lBc.iM].fa[lBc.iFa],
-                                            simulation->logger);
-    } else {
-      lBc.robin_bc = RobinBoundaryCondition(bc_params->stiffness.value(), 
-                                            bc_params->damping.value(),
-                                            bc_params->apply_along_normal_direction.value(),
-                                            com_mod.msh[lBc.iM].fa[lBc.iFa],
-                                            simulation->logger);
+  if (utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_Robin))) {
+    initialize_robin_bc(simulation, bc_params, lBc, false);
+  }
+
+  if (utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_CMM))) {
+    const bool robin_requested = cmm_robin_requested(bc_params);
+    const bool normal_only_defined = bc_params->apply_along_normal_direction.defined();
+
+    if (normal_only_defined && !robin_requested) {
+      throw std::runtime_error(
+          "[read_bc] Apply_along_normal_direction on a Type = CMM boundary condition "
+          "requires Robin support to be enabled with Stiffness, Damping, or "
+          "Spatial_values_file_path.");
+    }
+
+    if (robin_requested) {
+      initialize_robin_bc(simulation, bc_params, lBc, true);
     }
   }
 
@@ -3284,4 +3345,3 @@ void set_equation_properties(Simulation* simulation, EquationParameters* eq_para
 }
 
 };
-

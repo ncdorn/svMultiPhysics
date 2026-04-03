@@ -459,7 +459,7 @@ void iterate_solution(Simulation* simulation)
         #ifdef debug_iterate_solution
         dmsg << "Apply CMM BC conditions ... " << std::endl;
         #endif
-        set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Dg);
+        set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Yg, Dg);
       }
 
       // Apply weakly applied Dirichlet BCs

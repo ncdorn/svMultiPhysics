@@ -187,7 +187,7 @@ C++ functions are defined within a `namespace` defined for each Fortran file. Fo
              - [<b> trilinos_doassem_(const_cast<int&>(eNoN), ptr.data(), lK.data(), lR.data())</b>](#) - If using Trilinos
              - [<b> lhsa_ns::do_assem(com_mod, eNoN, ptr, lK, lR)</b>](#do_assem) - If not using Trilinos
          - [<b> set_bc::set_bc_neu(com_mod, cm_mod, Yg, Dg) </b>](#set_bc_neu)
-         - [<b> set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Dg) </b>](#set_bc_cmm)
+         - [<b> set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Yg, Dg) </b>](#set_bc_cmm)
          - [<b> set_bc::set_bc_dir_w(com_mod, Yg, Dg) </b>](#)
          - [<b> contact::contact_forces(com_mod, cm_mod, Dg) </b>](#)
          - [<b> all_fun::commu(com_mod, com_mod.R) </b>](#) - Synchronize residual R across processes
@@ -1370,7 +1370,7 @@ lD(tDof, tnNo)
    - `bf::set_bf(com_mod, Dg)`
    - `eq_assem::global_eq_assem(com_mod, com_mod.msh[iM], Ag, Yg, Dg)` - For each mesh
    - `set_bc::set_bc_neu(com_mod, cm_mod, Yg, Dg)`
-   - `set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Dg)`
+   - `set_bc::set_bc_cmm(com_mod, cm_mod, Ag, Yg, Dg)`
    - `set_bc::set_bc_dir_w(com_mod, Yg, Dg)` - Apply weakly applied Dirichlet BCs
    - `contact::contact_forces(com_mod, cm_mod, Dg)`
    - `all_fun::commu(com_mod, com_mod.R)` - Synchronize residual across processes

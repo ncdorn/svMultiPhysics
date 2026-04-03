@@ -560,7 +560,7 @@ void rcr_init(ComMod& com_mod, const CmMod& cm_mod)
 
 /// @brief Below defines the SET_BC methods for the Coupled Momentum Method (CMM)
 //
-void set_bc_cmm(ComMod& com_mod, const CmMod& cm_mod, const Array<double>& Ag, const Array<double>& Dg ) 
+void set_bc_cmm(ComMod& com_mod, const CmMod& cm_mod, const Array<double>& Ag, const Array<double>& Yg, const Array<double>& Dg ) 
 {
   using namespace consts;
 
@@ -581,7 +581,12 @@ void set_bc_cmm(ComMod& com_mod, const CmMod& cm_mod, const Array<double>& Ag, c
       throw std::runtime_error("[set_bc_cmm] CMM equation is formulated for tetrahedral elements (volume) and triangular (surface) elements");
     }
 
-    set_bc_cmm_l(com_mod, cm_mod, com_mod.msh[iM].fa[iFa], Ag, Dg);
+    auto& face = com_mod.msh[iM].fa[iFa];
+    set_bc_cmm_l(com_mod, cm_mod, face, Ag, Dg);
+
+    if (bc.robin_bc.is_initialized()) {
+      set_bc_rbnl(com_mod, face, bc.robin_bc, Yg, Dg);
+    }
   }
 }
 
@@ -1909,5 +1914,4 @@ void set_bc_undef_neu_l(ComMod& com_mod, const bcType& lBc, const faceType& lFa)
 }
 
 };
-
 

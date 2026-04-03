@@ -1,6 +1,6 @@
 import os
 
-from .conftest import run_with_reference
+from .conftest import run_expect_failure, run_with_reference
 
 # Common folder for all tests in this file
 base_folder = "cmm"
@@ -26,6 +26,26 @@ def test_pipe_3d(n_proc):
     prestress_cmm_folder = os.path.join(folder, "3b-prestress-cmm")
     t_max = 5
     run_with_reference(base_folder, prestress_cmm_folder, fields[1::], n_proc, t_max)
+
+
+def test_pipe_3d_cmm_robin_zero_uniform(n_proc):
+    folder = os.path.join("pipe_3d", "3c-inflate-cmm-robin-zero-uniform")
+    run_with_reference(base_folder, folder, fields[1::], n_proc, t_max=5, name_ref="../3a-inflate-cmm/result_005.vtu")
+
+
+def test_pipe_3d_cmm_robin_zero_spatial(n_proc):
+    folder = os.path.join("pipe_3d", "3d-inflate-cmm-robin-zero-spatial")
+    run_with_reference(base_folder, folder, fields[1::], n_proc, t_max=5, name_ref="../3a-inflate-cmm/result_005.vtu")
+
+
+def test_pipe_3d_robin_type_rejected_for_cmm():
+    folder = os.path.join("cases", base_folder, "pipe_3d", "3e-inflate-cmm-invalid-robin")
+    result = run_expect_failure(folder, n_proc=1)
+
+    assert result.returncode != 0
+    output = result.stdout + result.stderr
+    assert "Type = CMM" in output
+    assert "Robin support for deformable CMM walls" in output
 
 
 def test_iliac_artery_variable_wall_props(n_proc):
