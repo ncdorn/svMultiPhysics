@@ -752,6 +752,33 @@ class BoundaryConditionRCRParameters : public ParameterLists
     bool value_set = false;
 };
 
+/// @brief Tissue support values for Robin support on CMM boundary conditions.
+///
+/// \code {.xml}
+/// <Tissue_support>
+///   <Stiffness> 1.0e6 </Stiffness>
+///   <Damping> 0.0 </Damping>
+///   <Apply_along_normal_direction> true </Apply_along_normal_direction>
+/// </Tissue_support>
+/// \endcode
+class BoundaryConditionTissueSupportParameters : public ParameterLists
+{
+  public:
+    BoundaryConditionTissueSupportParameters();
+
+    static const std::string xml_element_name_;
+
+    void set_values(tinyxml2::XMLElement* xml_elem);
+    void print_parameters();
+
+    Parameter<bool> apply_along_normal_direction;
+    Parameter<double> damping;
+    Parameter<std::string> spatial_values_file_path;
+    Parameter<double> stiffness;
+
+    bool value_set = false;
+};
+
 /// @brief The BoundaryConditionParameters stores paramaters for various
 /// type of boundary conditions under the Add_BC XML element.
 class BoundaryConditionParameters : public ParameterLists
@@ -764,6 +791,9 @@ class BoundaryConditionParameters : public ParameterLists
 
     // RCR parameters sub-element.
     BoundaryConditionRCRParameters rcr;
+
+    // Tissue support parameters sub-element for CMM Robin support.
+    BoundaryConditionTissueSupportParameters tissue_support;
 
     // Add_BC name= attribute.
     Parameter<std::string> name;
@@ -1774,4 +1804,3 @@ class Parameters {
 };
 
 #endif
-

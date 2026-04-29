@@ -101,8 +101,10 @@
    <Add_BC name="lumen_wall" >
       <Type> CMM </Type>
       <Initial_displacements_file_path> ../2a-inflate/result_003.vtu </Initial_displacements_file_path>
-      <Spatial_values_file_path> robin_zero.vtp </Spatial_values_file_path>
-      <Apply_along_normal_direction> true </Apply_along_normal_direction>
+      <Tissue_support>
+         <Spatial_values_file_path> robin_zero.vtp </Spatial_values_file_path>
+         <Apply_along_normal_direction> true </Apply_along_normal_direction>
+      </Tissue_support>
    </Add_BC>
 
 

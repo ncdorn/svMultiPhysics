@@ -33,23 +33,25 @@ namespace read_files_ns {
 
 namespace {
 
-bool cmm_robin_requested(BoundaryConditionParameters* bc_params)
+template <typename RobinParameters>
+bool robin_parameters_requested(const RobinParameters& robin_params)
 {
-  return bc_params->spatial_values_file_path.defined() ||
-         bc_params->stiffness.defined() ||
-         bc_params->damping.defined();
+  return robin_params.spatial_values_file_path.defined() ||
+         robin_params.stiffness.defined() ||
+         robin_params.damping.defined();
 }
 
+template <typename RobinParameters>
 void initialize_robin_bc(
     Simulation* simulation,
-    BoundaryConditionParameters* bc_params,
+    const RobinParameters& robin_params,
     bcType& lBc,
     bool use_explicit_scalar_defaults)
 {
   auto& com_mod = simulation->com_mod;
-  const bool use_spatial_values = bc_params->spatial_values_file_path.defined();
-  const bool scalar_stiffness_defined = bc_params->stiffness.defined();
-  const bool scalar_damping_defined = bc_params->damping.defined();
+  const bool use_spatial_values = robin_params.spatial_values_file_path.defined();
+  const bool scalar_stiffness_defined = robin_params.stiffness.defined();
+  const bool scalar_damping_defined = robin_params.damping.defined();
 
   if (use_spatial_values) {
     if (scalar_stiffness_defined || scalar_damping_defined) {
@@ -59,8 +61,8 @@ void initialize_robin_bc(
     }
 
     lBc.robin_bc = RobinBoundaryCondition(
-        bc_params->spatial_values_file_path.value(),
-        bc_params->apply_along_normal_direction.value(),
+        robin_params.spatial_values_file_path.value(),
+        robin_params.apply_along_normal_direction.value(),
         com_mod.msh[lBc.iM].fa[lBc.iFa],
         simulation->logger);
     return;
@@ -68,15 +70,15 @@ void initialize_robin_bc(
 
   const double stiffness = (use_explicit_scalar_defaults && !scalar_stiffness_defined)
                                ? 0.0
-                               : bc_params->stiffness.value();
+                               : robin_params.stiffness.value();
   const double damping = (use_explicit_scalar_defaults && !scalar_damping_defined)
                              ? 0.0
-                             : bc_params->damping.value();
+                             : robin_params.damping.value();
 
   lBc.robin_bc = RobinBoundaryCondition(
       stiffness,
       damping,
-      bc_params->apply_along_normal_direction.value(),
+      robin_params.apply_along_normal_direction.value(),
       com_mod.msh[lBc.iM].fa[lBc.iFa],
       simulation->logger);
 }
@@ -227,8 +229,9 @@ void read_bc(Simulation* simulation, EquationParameters* eq_params, eqType& lEq,
     if (lEq.phys == EquationType::phys_CMM) {
       throw std::runtime_error(
           "[read_bc] Robin support for deformable CMM walls must be configured on a "
-          "Type = CMM boundary condition using Robin fields such as Stiffness, Damping, "
-          "Spatial_values_file_path, and Apply_along_normal_direction.");
+          "Type = CMM boundary condition using a Tissue_support subsection that "
+          "contains Stiffness, Damping, Spatial_values_file_path, and "
+          "Apply_along_normal_direction.");
     }
     lBc.bType = utils::ibset(lBc.bType, enum_int(BoundaryConditionType::bType_Robin)); 
     lBc.bType = utils::ibset(lBc.bType, enum_int(BoundaryConditionType::bType_Neu)); 
@@ -423,23 +426,52 @@ void read_bc(Simulation* simulation, EquationParameters* eq_params, eqType& lEq,
 
   // Stiffness and damping parameters for Robin BC
   if (utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_Robin))) {
-    initialize_robin_bc(simulation, bc_params, lBc, false);
+    if (bc_params->tissue_support.value_set) {
+      throw std::runtime_error(
+          "[read_bc] Tissue_support is only valid on a Type = CMM boundary condition.");
+    }
+
+    initialize_robin_bc(simulation, *bc_params, lBc, false);
   }
 
   if (utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_CMM))) {
-    const bool robin_requested = cmm_robin_requested(bc_params);
-    const bool normal_only_defined = bc_params->apply_along_normal_direction.defined();
+    const bool legacy_robin_requested =
+        robin_parameters_requested(*bc_params) ||
+        bc_params->apply_along_normal_direction.defined();
+
+    if (legacy_robin_requested) {
+      throw std::runtime_error(
+          "[read_bc] Stiffness, Damping, Apply_along_normal_direction, and "
+          "Spatial_values_file_path for a Type = CMM boundary condition must be "
+          "defined inside the Tissue_support subsection.");
+    }
+
+    const auto& tissue_support = bc_params->tissue_support;
+    const bool robin_requested = robin_parameters_requested(tissue_support);
+    const bool normal_only_defined = tissue_support.apply_along_normal_direction.defined();
 
     if (normal_only_defined && !robin_requested) {
       throw std::runtime_error(
-          "[read_bc] Apply_along_normal_direction on a Type = CMM boundary condition "
+          "[read_bc] Apply_along_normal_direction in a Type = CMM Tissue_support subsection "
           "requires Robin support to be enabled with Stiffness, Damping, or "
           "Spatial_values_file_path.");
     }
 
-    if (robin_requested) {
-      initialize_robin_bc(simulation, bc_params, lBc, true);
+    if (tissue_support.value_set && !robin_requested) {
+      throw std::runtime_error(
+          "[read_bc] Tissue_support on a Type = CMM boundary condition requires "
+          "Stiffness, Damping, or Spatial_values_file_path.");
     }
+
+    if (robin_requested) {
+      initialize_robin_bc(simulation, tissue_support, lBc, true);
+    }
+  }
+
+  if (!utils::btest(lBc.bType, enum_int(BoundaryConditionType::bType_CMM)) &&
+      bc_params->tissue_support.value_set) {
+    throw std::runtime_error(
+        "[read_bc] Tissue_support is only valid on a Type = CMM boundary condition.");
   }
 
   // To impose value or flux

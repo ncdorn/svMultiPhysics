@@ -101,9 +101,11 @@
    <Add_BC name="lumen_wall" >
       <Type> CMM </Type>
       <Initial_displacements_file_path> ../2a-inflate/result_003.vtu </Initial_displacements_file_path>
-      <Stiffness> 0.0 </Stiffness>
-      <Damping> 0.0 </Damping>
-      <Apply_along_normal_direction> true </Apply_along_normal_direction>
+      <Tissue_support>
+         <Stiffness> 0.0 </Stiffness>
+         <Damping> 0.0 </Damping>
+         <Apply_along_normal_direction> true </Apply_along_normal_direction>
+      </Tissue_support>
    </Add_BC>
 
 

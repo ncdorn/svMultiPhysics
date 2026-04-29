@@ -367,6 +367,7 @@ void BodyForceParameters::set_values(tinyxml2::XMLElement* xml_elem)
 /// @brief Define the XML element name for equation boundary condition parameters.
 const std::string BoundaryConditionParameters::xml_element_name_ = "Add_BC";
 const std::string BoundaryConditionRCRParameters::xml_element_name_ = "RCR_values";
+const std::string BoundaryConditionTissueSupportParameters::xml_element_name_ = "Tissue_support";
 
 /// @brief RCR values for Neumann BC type.
 BoundaryConditionRCRParameters::BoundaryConditionRCRParameters()
@@ -402,6 +403,41 @@ void BoundaryConditionRCRParameters::print_parameters()
   std::cout << "---------------------------------" << std::endl;
   std::cout << "Boundary Condition RCR Parameters" << std::endl;
   std::cout << "---------------------------------" << std::endl;
+
+  auto params_name_value = get_parameter_list();
+  for (auto& [ key, value ] : params_name_value) {
+    std::cout << key << ": " << value << std::endl;
+  }
+}
+
+BoundaryConditionTissueSupportParameters::BoundaryConditionTissueSupportParameters()
+{
+  bool required = true;
+
+  set_parameter("Apply_along_normal_direction", false, !required, apply_along_normal_direction);
+  set_parameter("Damping", 1.0, !required, damping);
+  set_parameter("Spatial_values_file_path", "", !required, spatial_values_file_path);
+  set_parameter("Stiffness", 1.0, !required, stiffness);
+}
+
+void BoundaryConditionTissueSupportParameters::set_values(tinyxml2::XMLElement* xml_elem)
+{
+  std::string error_msg = "Unknown " + xml_element_name_ + " XML element '";
+  using std::placeholders::_1;
+  using std::placeholders::_2;
+  std::function<void(const std::string&, const std::string&)> ftpr =
+      std::bind(&BoundaryConditionTissueSupportParameters::set_parameter_value, *this, _1, _2);
+  xml_util_set_parameters(ftpr, xml_elem, error_msg);
+
+  value_set = true;
+}
+
+void BoundaryConditionTissueSupportParameters::print_parameters()
+{
+  std::cout << std::endl;
+  std::cout << "--------------------------------------------" << std::endl;
+  std::cout << "Boundary Condition Tissue Support Parameters" << std::endl;
+  std::cout << "--------------------------------------------" << std::endl;
 
   auto params_name_value = get_parameter_list();
   for (auto& [ key, value ] : params_name_value) {
@@ -476,6 +512,7 @@ void BoundaryConditionParameters::print_parameters()
   }
 
   rcr.print_parameters();
+  tissue_support.print_parameters();
 }
 
 void BoundaryConditionParameters::set_values(tinyxml2::XMLElement* xml_elem)
@@ -498,6 +535,10 @@ void BoundaryConditionParameters::set_values(tinyxml2::XMLElement* xml_elem)
 
     if (name == BoundaryConditionRCRParameters::xml_element_name_) {
       rcr.set_values(item);
+    }
+
+    else if (name == BoundaryConditionTissueSupportParameters::xml_element_name_) {
+      tissue_support.set_values(item);
     }
    
     else if (item->GetText() != nullptr) {
