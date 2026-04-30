@@ -44,6 +44,12 @@ def n_proc(request):
     return request.param
 
 
+def resolve_case_dir(folder):
+    if os.path.isabs(folder):
+        return folder
+    return os.path.join(this_file_dir, folder)
+
+
 def run_by_name(folder, name, t_max, n_proc=1):
     """
     Run a test case and return results
@@ -56,6 +62,8 @@ def run_by_name(folder, name, t_max, n_proc=1):
     Returns:
     Simulation results
     """
+
+    folder = resolve_case_dir(folder)
 
     # remove old results folders if they exist
     dir_path = os.path.join(folder, str(n_proc) + "-procs")
@@ -120,6 +128,8 @@ def run_expect_failure(folder, name="solver.xml", n_proc=1):
         name: name of svMultiPhysics input file (.xml)
         n_proc: number of processors
     """
+
+    folder = resolve_case_dir(folder)
 
     if is_not_Darwin:
         if "petsc" in folder:
@@ -197,7 +207,7 @@ def run_with_reference(
             res = run_by_name(folder, name_inp, t_max, n_proc)
 
     # read reference
-    fname = os.path.join(folder, name_ref)
+    fname = os.path.join(resolve_case_dir(folder), name_ref)
     ref = meshio.read(fname)
 
     # check results
@@ -255,3 +265,42 @@ def run_with_reference(
     # check all fields first and then throw error if any failed
     if msg:
         raise AssertionError(msg)
+
+
+def run_with_displacement_mean_reduction(
+    base_folder,
+    baseline_folder,
+    test_folder,
+    n_proc=1,
+    t_max=1,
+    min_reduction=0.05,
+    name_inp="solver.xml",
+):
+    """
+    Run a baseline and comparison case and assert the mean displacement
+    magnitude of the comparison run is reduced by at least min_reduction.
+    """
+    baseline_path = os.path.join(this_file_dir, "cases", base_folder, baseline_folder)
+    test_path = os.path.join(this_file_dir, "cases", base_folder, test_folder)
+
+    baseline = run_by_name(baseline_path, name_inp, t_max, n_proc)
+    test = run_by_name(test_path, name_inp, t_max, n_proc)
+
+    if "Displacement" not in baseline.point_data:
+        raise ValueError("Field Displacement not in baseline result")
+    if "Displacement" not in test.point_data:
+        raise ValueError("Field Displacement not in comparison result")
+
+    baseline_mean = np.linalg.norm(baseline.point_data["Displacement"], axis=1).mean()
+    test_mean = np.linalg.norm(test.point_data["Displacement"], axis=1).mean()
+
+    if baseline_mean <= 0.0:
+        raise AssertionError("Baseline mean displacement magnitude must be positive")
+
+    reduction = 1.0 - test_mean / baseline_mean
+    if reduction < min_reduction:
+        raise AssertionError(
+            "Mean displacement magnitude reduction was "
+            f"{reduction:.2%}, below the required {min_reduction:.2%}. "
+            f"Baseline={baseline_mean:.6e}, comparison={test_mean:.6e}"
+        )

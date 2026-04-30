@@ -1,6 +1,10 @@
 import os
 
-from .conftest import run_expect_failure, run_with_reference
+from .conftest import (
+    run_expect_failure,
+    run_with_displacement_mean_reduction,
+    run_with_reference,
+)
 
 # Common folder for all tests in this file
 base_folder = "cmm"
@@ -46,6 +50,17 @@ def test_pipe_3d_robin_type_rejected_for_cmm():
     output = result.stdout + result.stderr
     assert "Type = CMM" in output
     assert "Robin support for deformable CMM walls" in output
+
+
+def test_pipe_3d_cmm_robin_nonzero_uniform_reduces_displacement():
+    run_with_displacement_mean_reduction(
+        base_folder,
+        os.path.join("pipe_3d", "3a-inflate-cmm"),
+        os.path.join("pipe_3d", "3f-inflate-cmm-robin-uniform-nonzero"),
+        n_proc=1,
+        t_max=5,
+        min_reduction=0.05,
+    )
 
 
 def test_iliac_artery_variable_wall_props(n_proc):

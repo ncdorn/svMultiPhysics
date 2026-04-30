@@ -265,6 +265,35 @@ target_link_libraries(${SV_MULTIPHYSICS_EXE}
   ${VTK_LIBRARIES}
   )
 
+set(_sv_multiphysics_rpath_libraries ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+set(_sv_multiphysics_rpath_dirs)
+foreach(_sv_multiphysics_rpath_library IN LISTS _sv_multiphysics_rpath_libraries)
+  if(IS_ABSOLUTE "${_sv_multiphysics_rpath_library}")
+    get_filename_component(_sv_multiphysics_rpath_dir "${_sv_multiphysics_rpath_library}" DIRECTORY)
+    list(APPEND _sv_multiphysics_rpath_dirs "${_sv_multiphysics_rpath_dir}")
+  endif()
+endforeach()
+set(_sv_multiphysics_runtime_libraries)
+foreach(_sv_multiphysics_runtime_library libstdc++.so libgfortran.so libquadmath.so libgcc_s.so)
+  execute_process(
+    COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=${_sv_multiphysics_runtime_library}
+    OUTPUT_VARIABLE _sv_multiphysics_runtime_library_path
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+  if(IS_ABSOLUTE "${_sv_multiphysics_runtime_library_path}")
+    get_filename_component(_sv_multiphysics_runtime_library_dir "${_sv_multiphysics_runtime_library_path}" DIRECTORY)
+    list(APPEND _sv_multiphysics_runtime_libraries "${_sv_multiphysics_runtime_library_path}")
+    list(APPEND _sv_multiphysics_rpath_dirs "${_sv_multiphysics_runtime_library_dir}")
+  endif()
+endforeach()
+if(_sv_multiphysics_runtime_libraries)
+  target_link_libraries(${SV_MULTIPHYSICS_EXE} ${_sv_multiphysics_runtime_libraries})
+endif()
+if(_sv_multiphysics_rpath_dirs)
+  list(REMOVE_DUPLICATES _sv_multiphysics_rpath_dirs)
+  set_property(TARGET ${SV_MULTIPHYSICS_EXE} APPEND PROPERTY INSTALL_RPATH "${_sv_multiphysics_rpath_dirs}")
+endif()
+
 # extra MPI libraries only if there are not set to NOT_FOUND or other null
 if(SV_MPI_EXTRA_LIBRARY)
   target_link_libraries(${SV_MULTIPHYSICS_EXE} ${SV_MPI_EXTRA_LIBRARY})
