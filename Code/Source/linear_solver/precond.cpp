@@ -73,7 +73,7 @@ void pos_mul(const Array<int>& rowPtr, const Vector<int>& colPtr, const int nNo,
           int a = colPtr(i);
           for (int b = 0; b < dof; b++) {
             int j = dof*(dof-1) + b;
-            for (int k = b; k < j; k += dof) {
+            for (int k = b; k <= j; k += dof) {
               Val(k,i) = Val(k,i)*W(b,a);
             }
           }
@@ -225,6 +225,18 @@ void precond_diag(fsi_linear_solver::FSILS_lhsType& lhs, const Array<int>& rowPt
           face.valM(i,a) = face.val(i,a) * W(i,Ac);
         }
       }
+      
+      // If this is a Coupled BC with a cap, also compute cap_valM from cap_val
+      if (face.has_cap) {
+        int cap_nNo = face.cap_val.ncols();
+        for (int a = 0; a < cap_nNo; a++) {
+          int Ac = face.cap_glob(a);
+          if (Ac < 0) continue;  // cap node not on this rank
+          for (int i = 0; i < std::min(face.dof,dof); i++) {
+            face.cap_valM(i,a) = face.cap_val(i,a) * W(i,Ac);
+          }
+        }
+      }
     }
   }
 }
@@ -291,52 +303,16 @@ void precond_rcs(fsi_linear_solver::FSILS_lhsType& lhs, const Array<int>& rowPtr
 
   pos_mul(rowPtr, colPtr, lhs.nNo, lhs.nnz, dof, Val, Wr);
 
-  // Set diagonal term to one
+  // Preserve free diagonals: subtracting and adding one loses small values.
   //
-  switch (dof) {
-    case 1:
-      for (int Ac = 0; Ac < nNo; Ac++) {
-        int d = diagPtr(Ac);
-        Val(0,d) = Wr(0,Ac) * (Val(0,d) - 1.0) + 1.0;
+  for (int Ac = 0; Ac < nNo; ++Ac) {
+    const int d = diagPtr(Ac);
+    for (int i = 0; i < dof; ++i) {
+      if (Wr(i, Ac) == 0.0) {
+        Val(i * dof + i, d) = 1.0;
       }
-    break; 
-
-    case 2:
-      for (int Ac = 0; Ac < nNo; Ac++) {
-        int d = diagPtr(Ac);
-        Val(0,d) = Wr(0,Ac)*(Val(0,d)-1.0) + 1.0;
-        Val(3,d) = Wr(1,Ac)*(Val(3,d)-1.0) + 1.0;
-      }
-    break; 
-
-    case 3:
-      for (int Ac = 0; Ac < nNo; Ac++) {
-        int d = diagPtr(Ac);
-        Val(0,d) = Wr(0,Ac)*(Val(0,d)-1.0) + 1.0;
-        Val(4,d) = Wr(1,Ac)*(Val(4,d)-1.0) + 1.0;
-        Val(8,d) = Wr(2,Ac)*(Val(8,d)-1.0) + 1.0;
-      }
-    break; 
-
-    case 4:
-      for (int Ac = 0; Ac < nNo; Ac++) {
-        int d = diagPtr(Ac);
-        Val(0 ,d) = Wr(0,Ac)*(Val(0 ,d)-1.0) + 1.0;
-        Val(5 ,d) = Wr(1,Ac)*(Val(5 ,d)-1.0) + 1.0;
-        Val(10,d) = Wr(2,Ac)*(Val(10,d)-1.0) + 1.0;
-        Val(15,d) = Wr(3,Ac)*(Val(15,d)-1.0) + 1.0;
-      }
-    break; 
-
-    default: 
-      for (int Ac = 0; Ac < nNo; Ac++) {
-        int d = diagPtr(Ac);
-        for (int i = 0; i < dof; i++) {
-          Val(i*dof+i,d) = Wr(i,Ac)*(Val(i*dof+i,d) - 1.0) + 1.0;
-        }
-      }
-    break; 
-  } 
+    }
+  }
 
   //*****************************************************
   // Row and column scaling
@@ -463,7 +439,7 @@ void precond_rcs(fsi_linear_solver::FSILS_lhsType& lhs, const Array<int>& rowPtr
           int b = rowPtr(1,Ac);
 
           for (int i = 0; i < dof; i++) {
-            int j = i*dof + 1;
+            int j = i*dof;
             int k = (i+1)*dof - 1; 
             auto vals = Val.values({j,k}, {a,b});
             Wr(i,Ac) = fabs(*std::max_element(vals.begin(), vals.end(), max_func));

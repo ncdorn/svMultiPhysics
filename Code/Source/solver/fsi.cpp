@@ -5,14 +5,15 @@
 
 #include "all_fun.h"
 #include "consts.h"
-#include "fluid.h"
+#include "fluid/fluid.h"
 #include "fs.h"
 #include "lhsa.h"
 #include "nn.h"
-#include "sv_struct.h"
-#include "ustruct.h"
+#include "solid/sv_struct.h"
+#include "solid/ustruct.h"
 #include "utils.h"
 #include "ris.h"
+#include "uris.h"
 
 #include <array>
 #include <iomanip>
@@ -46,7 +47,6 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
   }
 
   // l = 3, if nsd==2 ; else 6;
-  auto& cem = cep_mod.cem;
   const int l = com_mod.nsymd;
   const int nsd  = com_mod.nsd;
   const int tDof = com_mod.tDof;
@@ -68,7 +68,8 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
   Array3<double> lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN);
   Array<double> xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN), 
       fN(nsd,nFn), pS0l(nsymd,eNoN), lR(dof,eNoN);
-  Vector<double> pSl(nsymd), ya_l(eNoN);
+  Vector<double> pSl(nsymd);
+  ActiveStress::Evaluator active_stress_evaluator;
 
   std::array<fsType,2> fs_1;
   fs::get_thood_fs(com_mod, fs_1, lM, vmsStab, 1);
@@ -80,7 +81,6 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
   //
   double struct_3d_time = 0.0;
   double fluid_3d_time = 0.0;
-  double DDir = 0.0;
 
   for (int e = 0; e < lM.nEl; e++) {
     // setting globals
@@ -98,7 +98,14 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
     // Create local copies
     fN  = 0.0;
     pS0l = 0.0;
-    ya_l = 0.0;
+
+    if (lM.fN.size() != 0) {
+      for (int iFn = 0; iFn < nFn; iFn++) {
+        for (int i = 0; i < nsd; i++) {
+          fN(i,iFn) = lM.fN(i+nsd*iFn,e);
+        }
+      }
+    }
 
     for (int a = 0; a < eNoN; a++) {
       int Ac = lM.IEN(a,e);
@@ -114,21 +121,16 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
         dl(i,a) = Dg(i,Ac);
       }
 
-      if (lM.fN.size() != 0) {
-        for (int iFn = 0; iFn < nFn; iFn++) {
-          for (int i = 0; i < nsd; i++) {
-            fN(i,iFn) = lM.fN(i+nsd*iFn,e);
-          }
-        }
-      }
-
       if (pS0.size() != 0) {
         pS0l.set_col(a, pS0.col(Ac));
       }
 
-      if (cem.cpld) {
-        ya_l(a) = cem.Ya(Ac);
-      }
+    }
+
+    if (eq.dmn[cDmn].active_stress != nullptr) {
+      active_stress_evaluator.update(*eq.dmn[cDmn].active_stress, ptr);
+    } else {
+      active_stress_evaluator.clear();
     }
 
     // For FSI, fluid domain should be in the current configuration
@@ -165,6 +167,13 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
     //
     double Jac{0.0};
     Array<double> ksix(nsd,nsd);
+    // Total resistance factor value of the RIS valves for the current element 
+    // at different quadrature points
+    Vector<double> urisFactorTotalEl;
+    Array<double> urisValveVelTermTotalEl;
+    if (com_mod.urisFlag) {
+      uris::eval_uris_ris_factors_quadrature(com_mod, lM, fs_1[0], e, urisFactorTotalEl, urisValveVelTermTotalEl);
+    }
 
     for (int g = 0; g < fs_1[0].nG; g++) {
       if (g == 0 || !fs_1[1].lShpF) {
@@ -175,7 +184,11 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
         }
       }
 
-      if (g == 0 || !fs_1[0].lShpF) {
+      // Shape function gradients and the viscous response are constant
+      // within linear triangles and tetrahedra.
+      const bool recompute_visc = (g == 0 || !fs_1[0].lShpF);
+
+      if (recompute_visc) {
         auto Nx = fs_1[0].Nx.rslice(g);
         nn::gnn(fs_1[0].eNoN, nsd, nsd, Nx, xwl, Nwx, Jac, ksix);
         if (utils::is_zero(Jac)) {
@@ -188,60 +201,28 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
 
       double w = fs_1[0].w(g) * Jac;
 
-      // Plot the coordinates of the quad point in the current configuration
-      if (com_mod.urisFlag) {
-        Vector<double> distSrf(com_mod.nUris);
-        distSrf = 0.0;
-        for (int a = 0; a < eNoN; a++) {
-          int Ac = lM.IEN(a,e);
-          for (int iUris = 0; iUris < com_mod.nUris; iUris++) {
-            distSrf(iUris) += fs_1[0].N(a,g) * std::fabs(com_mod.uris[iUris].sdf(Ac));
-          }
-        }
-
-        DDir = 0.0;
-        double sdf_deps_temp = 0;
-        double DDirTmp = 0.0;
-        for (int iUris = 0; iUris < com_mod.nUris; iUris++) {
-          // if (distSrf(iUris) <= com_mod.uris[iUris].sdf_deps) {
-          //   DDirTmp = (1 + cos(pi*distSrf(iUris)/com_mod.uris[iUris].sdf_deps))/
-          //             (2*com_mod.uris[iUris].sdf_deps*com_mod.uris[iUris].sdf_deps);
-          //   if (DDirTmp > DDir) {DDir = DDirTmp;}
-          // }
-
-          if (com_mod.uris[iUris].clsFlg) {
-            sdf_deps_temp = com_mod.uris[iUris].sdf_deps_close;
-          } else {
-            sdf_deps_temp = com_mod.uris[iUris].sdf_deps;
-          }
-          if (distSrf(iUris) <= sdf_deps_temp) {
-            DDirTmp = (1 + cos(pi*distSrf(iUris)/sdf_deps_temp))/
-                      (2*sdf_deps_temp*sdf_deps_temp);
-            if (DDirTmp > DDir) {DDir = DDirTmp;}
-          }
-        }
-
-        if (!com_mod.urisActFlag) {DDir = 0.0;}
-
-        // std::cout << "===== DDir: " << DDir << std::endl;
-      }
-
-
       if (nsd == 3) {
         switch (cPhys) {
           case Equation_fluid: {
             auto N0 = fs_1[0].N.col(g);
             auto N1 = fs_1[1].N.col(g);
+            double urisFactorTotal = 0.0;
+            Vector<double> urisValveVelTermTotal(nsd);
+            if (com_mod.urisFlag) {
+              urisFactorTotal = urisFactorTotalEl(g);
+              urisValveVelTermTotal = urisValveVelTermTotalEl.rcol(g);
+            }
             
             // using zero permeability to use Navier-Stokes here, not Navier-Stokes-Brinkman
-            // fluid::fluid_3d_m(com_mod, vmsStab, fs_1[0].eNoN, fs_1[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0);
-            fluid::fluid_3d_m(com_mod, vmsStab, fs_1[0].eNoN, fs_1[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0, DDir);
+            fluid::fluid_3d_m(com_mod, vmsStab, fs_1[0].eNoN, fs_1[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0, urisFactorTotal, urisValveVelTermTotal);
 
           } break;
 
           case Equation_struct: {
             auto N0 = fs_1[0].N.col(g);
-            struct_ns::struct_3d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK);
+            struct_ns::struct_3d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0,
+                                 Nwx, al, yl, dl, bfl, fN, pS0l, pSl,
+                                 active_stress_evaluator, lR, lK, recompute_visc);
           } break;
           case Equation_lElas:
             throw std::runtime_error("[construct_fsi] LELAS3D not implemented");
@@ -251,8 +232,11 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
           case Equation_ustruct:
             auto N0 = fs_1[0].N.col(g);
             auto N1 = fs_1[1].N.col(g);
-            ustruct::ustruct_3d_m(com_mod, cep_mod, vmsStab, fs_1[0].eNoN, fs_1[1].eNoN, nFn, w, Jac, N0, N1, Nwx, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd);
-          break;
+            ustruct::ustruct_3d_m(com_mod, cep_mod, vmsStab, fs_1[0].eNoN,
+                                  fs_1[1].eNoN, nFn, w, Jac, N0, N1, Nwx, al,
+                                  yl, dl, bfl, fN, active_stress_evaluator, lR,
+                                  lK, lKd, recompute_visc);
+            break;
           }
 
       } else if (nsd == 2) {
@@ -272,7 +256,9 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
 
           case Equation_struct: {
             auto N0 = fs_1[0].N.col(g);
-            struct_ns::struct_2d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0, Nwx, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK);
+            struct_ns::struct_2d(com_mod, cep_mod, fs_1[0].eNoN, nFn, w, N0,
+                                 Nwx, al, yl, dl, bfl, fN, pS0l, pSl,
+                                 active_stress_evaluator, lR, lK, recompute_visc);
           } break;
 
           case Equation_ustruct:
@@ -282,6 +268,14 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
         }
       }
     } // g: loop
+
+    // If the number of quadrature points is different for the continuity and 
+    // momentum function spaces, recompute the RIS factor
+    if (com_mod.urisFlag) {
+      if (urisFactorTotalEl.size() != fs_2[1].nG) {
+        uris::eval_uris_ris_factors_quadrature(com_mod, lM, fs_2[1], e, urisFactorTotalEl, urisValveVelTermTotalEl);
+      }
+    }
 
     // Gauss integration 2
     //
@@ -310,10 +304,15 @@ void construct_fsi(ComMod& com_mod, CepMod& cep_mod, const mshType& lM, const So
           case Equation_fluid: {
             auto N0 = fs_2[0].N.col(g);
             auto N1 = fs_2[1].N.col(g);
+            double urisFactorTotal = 0.0;
+            Vector<double> urisValveVelTermTotal(nsd);
+            if (com_mod.urisFlag) {
+              urisFactorTotal = urisFactorTotalEl(g);
+              urisValveVelTermTotal = urisValveVelTermTotalEl.rcol(g);
+            }
             
             // using zero permeability to use Navier-Stokes here, not Navier-Stokes-Brinkman
-            //fluid::fluid_3d_c(com_mod, vmsStab, fs_2[0].eNoN, fs_2[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0);
-            fluid::fluid_3d_c(com_mod, vmsStab, fs_2[0].eNoN, fs_2[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0, DDir);
+            fluid::fluid_3d_c(com_mod, vmsStab, fs_2[0].eNoN, fs_2[1].eNoN, w, ksix, N0, N1, Nwx, Nqx, Nwxx, al, yl, bfl, lR, lK, 0.0, urisFactorTotal, urisValveVelTermTotal);
           } break;
 
           case Equation_ustruct:

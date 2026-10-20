@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include "Core/Exception.h"
 
 Simulation::Simulation() 
 {
@@ -61,6 +62,21 @@ void Simulation::set_module_parameters()
   com_mod.startTS = general.starting_time_step.value();
   com_mod.dt = general.time_step_size.value();
 
+  com_mod.have_initial_homogeneous_pressure =
+      general.initial_homogeneous_pressure.defined();
+
+  if (com_mod.have_initial_homogeneous_pressure) {
+    for (const auto& mesh_param : parameters.mesh_parameters) {
+      svmp::throw_if<svmp::ParseException>(
+          mesh_param->initial_pressures_file_path.defined(),
+          "Cannot specify both Initial_homogeneous_pressure and a mesh "
+          "initial pressure file. Choose one pressure initialization method.");
+    }
+
+    com_mod.initial_homogeneous_pressure =
+        general.initial_homogeneous_pressure.value();
+  }
+
   com_mod.stopTrigName = general.searched_file_name_to_trigger_stop.value();
   com_mod.ichckIEN = general.check_ien_order.value();
   com_mod.saveVTK = general.save_results_to_vtk_format.value();
@@ -69,6 +85,7 @@ void Simulation::set_module_parameters()
   com_mod.saveIncr = general.increment_in_saving_vtk_files.value();
   com_mod.saveATS = general.start_saving_after_time_step.value();
   com_mod.saveAve = general.save_averaged_results.value();
+  com_mod.alwaysSaveDomainID = general.save_domain_id_in_every_file.value();
   com_mod.zeroAve = general.start_averaging_from_zero.value();
   com_mod.stFileRepl = general.overwrite_restart_file.value();
   com_mod.stFileName = chnl_mod.appPath + general.restart_file_name.value();

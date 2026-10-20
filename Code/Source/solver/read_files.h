@@ -19,7 +19,7 @@ namespace read_files_ns {
   using EquationNdop = std::array<int, 4>;
   using EquationOutputs = std::array<consts::OutputNameType, maxOutput>;
   using EquationPhys = std::vector<consts::EquationType>;
-  using EquationProps = std::array<std::array<consts::PhysicalProperyType, consts::maxNProp>, 20>;
+  using EquationProps = std::array<std::array<consts::PhysicalPropertyType, consts::maxNProp>, 20>;
 
   void face_match(ComMod& com_mod, faceType& lFa, faceType& gFa, Vector<int>& ptr);
 
@@ -29,16 +29,11 @@ namespace read_files_ns {
 
   void read_bf(ComMod& com_mod, BodyForceParameters* bf_params, bfType& lBf);
 
-  void read_cplbc_initialization_file(const std::string& file_name, cplBCType& cplBC);
-
   void read_domain(Simulation* simulation, EquationParameters* eq_params, eqType& lEq, EquationProps& propL,  EquationPhys = {});
 
   void read_eq(Simulation* simulation, EquationParameters* params, eqType& eq);
 
   void read_files(Simulation* simulation, const std::string& file_name);
-
-  void read_fourier_coeff_values_file(const std::string& file_name, bcType& lBc);
-  void read_fourier_coeff_values_file(const std::string& file_name, bfType& lBf);
 
   void read_ls(Simulation* simulation, EquationParameters* eq_params, consts::SolverType solver_type, eqType& lEq);
 
@@ -49,9 +44,6 @@ namespace read_files_ns {
   void read_rmsh(Simulation* simulation, EquationParameters* eq_param);
 
   void read_spatial_values(const ComMod& com_mod, const mshType& msh, const faceType& lFa, const std::string& file_name, bcType& lBc);
-
-  void read_temporal_values(const std::string& file_name, bcType& lBc);
-  void read_temporal_values(const std::string& file_name, bfType& lBf);
 
   void read_temp_spat_values(const ComMod& com_mod, const mshType& msh, const faceType& lFa, 
       const std::string& file_name, bcType& lBc);

@@ -48,6 +48,7 @@ set(CSRCS
 )
 
 add_library(${lib} ${SV_LIBRARY_TYPE} ${CSRCS})
+target_include_directories(${lib} PRIVATE ${SV_SOURCE_DIR}/ThirdParty/eigen/include/eigen3)
 
 set(_sv_linear_solver_mpi_libraries)
 if(TARGET MPI::MPI_CXX)

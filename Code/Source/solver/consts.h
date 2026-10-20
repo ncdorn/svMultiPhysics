@@ -16,13 +16,13 @@
 
 namespace consts {
 
-const double pi = 3.1415926535897932384626;
+constexpr int maxNSD = 3;
 
-const int maxNSD = 3;
+constexpr int maxNoN = 27; // Max node count in nn_elem_props.h
 
-const int maxNProp = 20;
+constexpr int maxNProp = 20;
 
-const int maxOutput = 5;
+constexpr int maxOutput = 5;
 
 /// Use inf numeric values to represent a value that is not set.
 const int int_inf = std::numeric_limits<int>::infinity();
@@ -103,6 +103,7 @@ enum class BoundaryConditionType
   bType_undefNeu = 21, // undeforming Neu
   bType_RCR = 22,      // RCR-Neu
   bType_Ris0D = 23,    // RIS 0D
+  bType_Coupled = 24,    // Coupled to 0D
 };
 
 // Define constants using smaller name and integer value (needed for bitwise operations).
@@ -136,6 +137,9 @@ constexpr auto iBC_impD = static_cast<int>(BoundaryConditionType::bType_impD);
 
 constexpr auto BC_Neu = BoundaryConditionType::bType_Neu;
 constexpr auto iBC_Neu = static_cast<int>(BoundaryConditionType::bType_Neu);
+
+constexpr auto BC_Coupled = BoundaryConditionType::bType_Coupled;
+constexpr auto iBC_Coupled = static_cast<int>(BoundaryConditionType::bType_Coupled);
 
 constexpr auto BC_para = BoundaryConditionType::bType_para;
 constexpr auto iBC_para = static_cast<int>(BoundaryConditionType::bType_para);
@@ -222,6 +226,7 @@ enum class CplBCType
   cplBC_I = 401,       // implicit
   cplBC_Neu = 66113,   // Neumann type coupling
   cplBC_SI = 402,      // semi-implicit
+  cplBC_Coupled = 66114,   // Coupled
 };
 
 /// @brief Map for cplBC type to CplBCType. 
@@ -284,9 +289,11 @@ enum class EquationType
   phys_CMM = 209, 
   phys_CEP = 210,
   phys_ustruct = 211,  // Nonlinear elastodynamics using mixed VMS-stabilized formulation 
-  phys_stokes = 212
+  phys_stokes = 212,
+  phys_darcy = 213
 };
 
+constexpr auto Equation_darcy = EquationType::phys_darcy;
 constexpr auto Equation_CMM = EquationType::phys_CMM;
 constexpr auto Equation_CEP = EquationType::phys_CEP;
 constexpr auto Equation_fluid = EquationType::phys_fluid;
@@ -311,63 +318,76 @@ enum class MeshGeneratorType
 /// Map for string to MeshGeneratorType. 
 extern const std::map<std::string,MeshGeneratorType> mesh_generator_name_to_type;
 
-enum class OutputNameType 
-{
-  outGrp_NA = 500, 
+enum class OutputNameType {
+  outGrp_NA = 500,
   outGrp_A = 501,
-  outGrp_Y = 502, 
-  outGrp_D = 503, 
-  outGrp_I = 504, 
-  outGrp_WSS = 505, 
-  outGrp_trac = 506, 
-  outGrp_vort = 507, 
+  outGrp_Y = 502,
+  outGrp_D = 503,
+  outGrp_I = 504,
+  outGrp_WSS = 505,
+  outGrp_trac = 506,
+  outGrp_vort = 507,
   outGrp_vortex = 508,
-  outGrp_stInv = 509, 
-  outGrp_eFlx = 510, 
+  outGrp_stInv = 509,
+  outGrp_eFlx = 510,
   outGrp_hFlx = 511,
-  outGrp_absV = 512, 
-  outGrp_fN = 513, 
+  outGrp_absV = 512,
+  outGrp_fN = 513,
   outGrp_fA = 514,
-  outGrp_stress = 515, 
-  outGrp_cauchy = 516, 
+  outGrp_stress = 515,
+  outGrp_cauchy = 516,
   outGrp_mises = 517,
-  outGrp_J = 518, 
-  outGrp_F = 519, 
+  outGrp_J = 518,
+  outGrp_F = 519,
   outGrp_strain = 520,
-  outGrp_divV = 521, 
+  outGrp_divV = 521,
   outGrp_Visc = 522,
   outGrp_fS = 523,
-  outGrp_C = 524, 
+  outGrp_C = 524,
   outGrp_I1 = 525,
+  outGrp_ionicState = 526,
+  outGrp_fibStretch = 527,
+  outGrp_fibStretchRate = 528,
+  outGrp_activeTensionFibers = 529,
+  outGrp_activeTensionSheets = 530,
+  outGrp_activeTensionNormal = 531,
+  outGrp_darcyFlux = 532,
 
   out_velocity = 599,
-  out_pressure = 598, 
-  out_temperature = 597, 
+  out_pressure = 598,
+  out_temperature = 597,
   out_voltage = 596,
-  out_acceleration = 595, 
-  out_displacement = 594, 
-  out_integ =593,
-  out_WSS = 592, 
-  out_traction = 591, 
+  out_acceleration = 595,
+  out_displacement = 594,
+  out_integ = 593,
+  out_WSS = 592,
+  out_traction = 591,
   out_vorticity = 590,
-  out_vortex = 589, 
-  out_strainInv = 588, 
+  out_vortex = 589,
+  out_strainInv = 588,
   out_energyFlux = 587,
-  out_heatFlux = 586, 
-  out_absVelocity = 585, 
+  out_heatFlux = 586,
+  out_absVelocity = 585,
   out_fibDir = 584,
-  out_fibAlign = 583, 
-  out_stress = 582, 
+  out_fibAlign = 583,
+  out_stress = 582,
   out_cauchy = 581,
-  out_mises = 580, 
-  out_jacobian = 579, 
+  out_mises = 580,
+  out_jacobian = 579,
   out_defGrad = 578,
-  out_strain = 577, 
-  out_divergence = 576, 
+  out_strain = 577,
+  out_divergence = 576,
   out_viscosity = 575,
   out_fibStrn = 574,
   out_CGstrain = 573,
-  out_CGInv1 = 572
+  out_CGInv1 = 572,
+  out_fibStretch = 571,
+  out_fibStretchRate = 570,
+  out_activeTensionFibers = 569,
+  out_activeTensionSheets = 568,
+  out_activeTensionNormal = 567,
+  out_darcyPressure = 566,
+  out_darcyFlux = 565
 };
 
 /// @brief Simulation output file types. 
@@ -383,7 +403,7 @@ extern const std::map<std::string,OutputType> output_type_name_to_type;
 
 /// @brief Possible physical properties. Current maxNPror is 20.
 //
-enum class PhysicalProperyType 
+enum class PhysicalPropertyType 
 {
   NA = 0, 
   fluid_density = 1, 
@@ -400,7 +420,10 @@ enum class PhysicalProperyType
   shell_thickness = 12, 
   ctau_M = 13,                 // stabilization coeffs. for USTRUCT (momentum, continuity)
   ctau_C = 14,
-  inverse_darcy_permeability = 15
+  brinkman_inverse_permeability = 15,
+  darcy_permeability = 16,
+  darcy_compressibility = 17,
+  darcy_fluid_viscosity = 18
 };
 
 enum class PreconditionerType 
@@ -491,4 +514,3 @@ enum class LinearAlgebraType {
 };
 
 #endif
-

@@ -11,31 +11,30 @@
 //
 ComMod::ComMod() 
 {
-  mvMsh        = false;
+  mvMsh              = false;
 
-  stFileFlag   = false;
-  stFileRepl   = false;
+  stFileFlag         = false;
+  stFileRepl         = false;
 
-  bin2VTK      = false;
-  saveAve      = false;
-  sepOutput    = false;
-  saveATS      = 1;
-  saveIncr     = 10;
-  nITs         = 0;
-  startTS      = 0;
-  stFileName   = "stFile";
-  iniFilePath  = "";
-  stopTrigName = "STOP_SIM";
-  ichckIEN     = true; 
-  zeroAve      = false;
-  cmmInit      = false;
-  cmmVarWall   = false;
-  shlEq        = false;
-  pstEq        = false;
-  sstEq        = false;
-  ibFlag       = false;
-  risFlag      = false;
-
+  bin2VTK            = false;
+  saveAve            = false;
+  alwaysSaveDomainID = false;
+  saveATS            = 1;
+  saveIncr           = 10;
+  nITs               = 0;
+  startTS            = 0;
+  stFileName         = "stFile";
+  iniFilePath        = "";
+  stopTrigName       = "STOP_SIM";
+  ichckIEN           = true;
+  zeroAve            = false;
+  cmmInit            = false;
+  cmmVarWall         = false;
+  shlEq              = false;
+  pstEq              = false;
+  sstEq              = false;
+  ibFlag             = false;
+  risFlag            = false;
 }
 
 //---------
@@ -66,6 +65,8 @@ void adjType::destroy()
 cplBCType::cplBCType()
 {
   schm = consts::CplBCType::cplBC_NA;
+  nSvZeroD_coupled_bc = 0;
+  svZeroD_coupled_bc_idxs.clear();
 }
 
 ///////////////////
@@ -188,10 +189,10 @@ rmshType::rmshType()
 
 
 /////////////////////////////////////////////////////////
-// s v Z e r o D S o l v e r I n t e r f a c e T y p e //
+// s v Z e r o D S o l v e r I n t e r f a c e D a t a //
 /////////////////////////////////////////////////////////
 
-void svZeroDSolverInterfaceType::set_data(const svZeroDSolverInterfaceParameters& params)
+void svZeroDSolverInterfaceData::set_data(const svZeroDSolverInterfaceParameters& params)
 {
   if (!params.defined()) {
     return;
@@ -216,15 +217,12 @@ void svZeroDSolverInterfaceType::set_data(const svZeroDSolverInterfaceParameters
   has_data = true;
 }
 
-//----------------
-// add_block_face
-//----------------
-// Add a block name / face name pair representing the coupling of a 
-// 0D block with a 3D face.
-//
-void svZeroDSolverInterfaceType::add_block_face(const std::string& block_name, const std::string& face_name)
+void svOneDSolverInterfaceData::set_data(const svOneDSolverInterfaceParameters& params)
 {
-  block_surface_map[block_name] = face_name;
+  if (!params.defined()) {
+    return;
+  }
+
+  solver_library = params.shared_library();
+  has_data       = true;
 }
-
-
