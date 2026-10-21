@@ -216,43 +216,18 @@ def run_expect_failure(folder, name="solver.xml", n_proc=1):
 
     folder = resolve_case_dir(folder)
 
-    if is_not_Darwin:
-        if "petsc" in folder:
-            cmd = " ".join(
-                [
-                    "mpirun",
-                    "--oversubscribe" if n_proc > 1 else "",
-                    "-np",
-                    str(n_proc),
-                    cpp_exec_p,
-                    name,
-                ]
-            )
-        else:
-            cmd = " ".join(
-                [
-                    "mpirun",
-                    "--oversubscribe" if n_proc > 1 else "",
-                    "-np",
-                    str(n_proc),
-                    cpp_exec,
-                    name,
-                ]
-            )
-    else:
-        if "petsc" in folder or "trilinos" in folder:
-            pytest.skip("Failure-path test not run for PETSc/Trilinos cases on Darwin")
-        else:
-            cmd = " ".join(
-                [
-                    "mpirun",
-                    "--oversubscribe" if n_proc > 1 else "",
-                    "-np",
-                    str(n_proc),
-                    cpp_exec,
-                    name,
-                ]
-            )
+    # Same launch as run_by_name (upstream #584 replaced the Darwin switch).
+    exe = cpp_exec_p if "petsc" in folder else cpp_exec
+    cmd = " ".join(
+        [
+            "mpirun",
+            OVERSUBSCRIBE_FLAG if n_proc > 1 else "",
+            "-np",
+            str(n_proc),
+            exe,
+            name,
+        ]
+    )
 
     return subprocess.run(cmd, cwd=folder, shell=True, capture_output=True, text=True)
 
